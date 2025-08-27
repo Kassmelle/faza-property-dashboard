@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Management Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+        const { Plus, Home, DollarSign, Calendar, TrendingUp, Edit2, Trash2, Info, Building2 } = lucide;
+
+        function PropertyManagementDashboard() {
+            // Mock data for immediate testing
+            const mockProperties = [
+                {
+                    id: 1001,
+                    name: 'Sunset Plaza',
+                    address: '123 Main Street',
+                    city: 'Calgary',
+                    country: 'Canada',
+                    buildingType: 'residential'
+                },
+                {
+                    id: 1002,
+                    name: 'Downtown Office Tower',
+                    address: '456 Business Ave',
+                    city: 'Toronto',
+                    country: 'Canada',
+                    buildingType: 'office'
+                },
+                {
+                    id: 1003,
+                    name: 'Retail Centre Mall',
+                    address: '789 Shopping Blvd',
+                    city: 'Vancouver',
+                    country: 'Canada',
+                    buildingType: 'retail'
+                }
+            ];
+
+            const mockUnits = [
+                {
+                    id: 3001,
+                    propertyId: 1001,
+                    unitNumber: '101',
+                    unitUse: 'Residential',
+                    type: 'apartment',
+                    bedrooms: 2,
+                    bathrooms: 1.5,
+                    sqft: 850,
+                    ownerFirstName: 'John',
+                    ownerLastName: 'Smith',
+                    ownerNationalId: 'AB123456',
+                    ownerPhone: '+1-403-555-0101',
+                    description: 'Modern apartment with balcony'
+                },
+                {
+                    id: 3002,
+                    propertyId: 1001,
+                    unitNumber: '102',
+                    unitUse: 'Residential',
+                    type: 'apartment',
+                    bedrooms: 1,
+                    bathrooms: 1,
+                    sqft: 650,
+                    ownerFirstName: 'Sarah',
+                    ownerLastName: 'Johnson',
+                    ownerNationalId: 'AB789012',
+                    ownerPhone: '+1-403-555-0102',
+                    description: 'Cozy one-bedroom unit'
+                },
+                {
+                    id: 3003,
+                    propertyId: 1002,
+                    unitNumber: '501',
+                    unitUse: 'Office',
+                    type: 'Medium',
+                    bedrooms: null,
+                    bathrooms: null,
+                    sqft: 1200,
+                    ownerFirstName: 'Michael',
+                    ownerLastName: 'Brown',
+                    ownerNationalId: 'ON345678',
+                    ownerPhone: '+1-416-555-0201',
+                    description: 'Corner office with city views'
+                }
+            ];
+
+            const mockLeases = [
+                {
+                    id: 4001,
+                    leaseId: 'LSE-533272-85',
+                    propertyId: 1001,
+                    unitId: 3001,
+                    tenantFirstName: 'Emily',
+                    tenantLastName: 'Davis',
+                    tenantId: 'TD001234',
+                    tenantAddress: '999 Tenant St, Calgary, AB',
+                    leaseStart: '2024-01-01',
+                    leaseDuration: 12,
+                    leaseEnd: '2024-12-31',
+                    totalContractValue: 25500,
+                    rentFreeMonths: 1,
+                    paymentOptions: 'monthly',
+                    deposit: 2000,
+                    status: 'active'
+                },
+                {
+                    id: 4002,
+                    leaseId: 'LSE-642385-96',
+                    propertyId: 1002,
+                    unitId: 3003,
+                    tenantFirstName: 'Robert',
+                    tenantLastName: 'Wilson',
+                    tenantId: 'BW005678',
+                    tenantAddress: '888 Office Dr, Toronto, ON',
+                    leaseStart: '2024-03-01',
+                    leaseDuration: 36,
+                    leaseEnd: '2027-02-28',
+                    totalContractValue: 129600,
+                    rentFreeMonths: 3,
+                    paymentOptions: 'quarterly',
+                    deposit: 7200,
+                    status: 'active'
+                }
+            ];
+
+            // State
+            const [properties, setProperties] = useState(mockProperties);
+            const [units, setUnits] = useState(mockUnits);
+            const [leases, setLeases] = useState(mockLeases);
+            const [marketRents, setMarketRents] = useState([]);
+            const [paymentStatuses, setPaymentStatuses] = useState({});
+            
+            const [activeTab, setActiveTab] = useState('properties');
+            const [showPropertyForm, setShowPropertyForm] = useState(false);
+            const [showUnitForm, setShowUnitForm] = useState(false);
+            const [showLeaseForm, setShowLeaseForm] = useState(false);
+            const [showPaymentModal, setShowPaymentModal] = useState(null);
+            const [paidDate, setPaidDate] = useState('');
+            
+            const [editingProperty, setEditingProperty] = useState(null);
+            const [editingUnit, setEditingUnit] = useState(null);
+            const [editingLease, setEditingLease] = useState(null);
+            
+            const [paymentFilters, setPaymentFilters] = useState({
+                showOverdue: false,
+                selectedProperty: '',
+                selectedUnit: '',
+                selectedOwner: '',
+                selectedTenant: ''
+            });
+
+            const [propertyForm, setPropertyForm] = useState({
+                name: '',
+                address: '',
+                city: '',
+                country: '',
+                buildingType: 'residential'
+            });
+
+            const [unitForm, setUnitForm] = useState({
+                propertyId: '',
+                unitNumber: '',
+                unitUse: 'Residential',
+                type: '',
+                bedrooms: '',
+                bathrooms: '',
+                sqft: '',
+                ownerFirstName: '',
+                ownerLastName: '',
+                ownerNationalId: '',
+                ownerPhone: '',
+                description: ''
+            });
+
+            const [leaseForm, setLeaseForm] = useState({
+                propertyId: '',
+                unitId: '',
+                tenantFirstName: '',
+                tenantLastName: '',
+                tenantId: '',
+                tenantAddress: '',
+                leaseStart: '',
+                leaseDuration: '12',
+                leaseEnd: '',
+                totalContractValue: '',
+                rentFreeMonths: '0',
+                paymentOptions: 'monthly',
+                deposit: '',
+                status: 'active'
+            });
+
+            // Helper functions
+            function formatDate(date) {
+                if (!date) return '';
+                const d = typeof date === 'string' ? new Date(date) : date;
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            function addMonthsClamped(date, months) {
+                const d = new Date(date);
+                const targetMonth = d.getMonth() + months;
+                const day = d.getDate();
+                d.setDate(1);
+                d.setMonth(targetMonth);
+                const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                d.setDate(Math.min(day, lastDay));
+                return d;
+            }
+
+            const generateLeaseId = () => {
+                const prefix = 'LSE';
+                const timestamp = Date.now().toString().slice(-6);
+                const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                return `${prefix}-${timestamp}-${random}`;
+            };
+
+            const calculateLeaseEndDate = (startDate, durationMonths) => {
+                if (!startDate || !durationMonths) return '';
+                return formatDate(addMonthsClamped(new Date(startDate), parseInt(durationMonths)));
+            };
+
+            const isUnitNumberUnique = (propertyId, unitNumber, unitId = null) => {
+                if (!propertyId || !unitNumber) return false;
+                return !units.some(u =>
+                    u.propertyId === parseInt(propertyId) &&
+                    u.unitNumber.trim().toLowerCase() === unitNumber.trim().toLowerCase() &&
+                    u.id !== unitId
+                );
+            };
+
+            const isPropertyNameUnique = (name, propertyId = null) => {
+                return !properties.some(property => 
+                    property.name.toLowerCase() === name.toLowerCase() && 
+                    property.id !== propertyId
+                );
+            };
+
+            const getUnitTypeOptions = (unitUse) => {
+                switch (unitUse) {
+                    case 'Residential':
+                        return ['apartment', 'house', 'condo', 'studio'];
+                    case 'Retail':
+                        return ['Kiosk', 'Small CRU', 'Medium CRU', 'Brand CRU', 'Anchor Space'];
+                    case 'Office':
+                        return ['Small', 'Medium', 'Large'];
+                    case 'Storage':
+                        return ['Small', 'Standard', 'Large', 'Extra-Large'];
+                    case 'Other':
+                        return ['custom'];
+                    default:
+                        return [];
+                }
+            };
+
+            const getPaymentFrequencyInMonths = (paymentOptions) => {
+                switch (paymentOptions) {
+                    case 'monthly': return 1;
+                    case 'quarterly': return 3;
+                    case 'every-6-months': return 6;
+                    case 'annual-upfront': return 12;
+                    default: return 1;
+                }
+            };
+
+            // Generate payment list
+            const generatePaymentsList = () => {
+                const allPayments = [];
+                
+                leases.filter(l => l.status === 'active').forEach(lease => {
+                    const unit = units.find(u => u.id === lease.unitId);
+                    const property = properties.find(p => p.id === unit?.propertyId);
+                    
+                    if (!unit || !property) return;
+                    
+                    const leaseStartDate = new Date(lease.leaseStart);
+                    const rentFreeMonths = parseInt(lease.rentFreeMonths) || 0;
+                    const leaseDuration = parseInt(lease.leaseDuration) || 0;
+                    const totalContractValue = parseFloat(lease.totalContractValue) || 0;
+                    const securityDeposit = parseFloat(lease.deposit) || 0;
+                    
+                    const actualPaymentMonths = Math.max(0, leaseDuration - rentFreeMonths);
+                    
+                    let numberOfInstalments = 0;
+                    if (actualPaymentMonths > 0) {
+                        const paymentFrequency = getPaymentFrequencyInMonths(lease.paymentOptions);
+                        numberOfInstalments = Math.ceil(actualPaymentMonths / paymentFrequency);
+                    }
+                    
+                    const amountPerInstalment = numberOfInstalments > 0 ? (totalContractValue / numberOfInstalments) : 0;
+                    const includeDeposit = securityDeposit > 0;
+                    const totalPayments = numberOfInstalments + (includeDeposit ? 1 : 0);
+                    
+                    // Generate Security Deposit Payment
+                    if (includeDeposit) {
+                        allPayments.push({
+                            paymentId: `${lease.leaseId}-${totalPayments.toString().padStart(2, '0')}-01`,
+                            propertyName: property.name,
+                            unitName: unit.unitNumber,
+                            unitOwner: `${unit.ownerFirstName} ${unit.ownerLastName}`,
+                            tenant: `${lease.tenantFirstName} ${lease.tenantLastName}`,
+                            paymentDueDate: formatDate(new Date(lease.leaseStart)),
+                            paymentAmount: securityDeposit,
+                            paymentDescription: 'Security Deposit'
+                        });
+                    }
+                    
+                    // Generate Lease Instalment Payments
+                    if (numberOfInstalments > 0) {
+                        const firstLeasePaymentDate = addMonthsClamped(leaseStartDate, rentFreeMonths);
+                        
+                        for (let i = 1; i <= numberOfInstalments; i++) {
+                            const paymentFrequency = getPaymentFrequencyInMonths(lease.paymentOptions);
+                            const paymentDate = addMonthsClamped(firstLeasePaymentDate, (i - 1) * paymentFrequency);
+                            
+                            const paymentNumber = (includeDeposit ? i + 1 : i).toString().padStart(2, '0');
+                            const isLastPayment = i === numberOfInstalments;
+                            
+                            let description;
+                            if (i === 1) {
+                                description = 'First Lease Instalment';
+                            } else if (isLastPayment) {
+                                description = 'Last Lease Instalment';
+                            } else {
+                                description = `Lease Instalment ${i}`;
+                            }
+                            
+                            allPayments.push({
+                                paymentId: `${lease.leaseId}-${totalPayments.toString().padStart(2, '0')}-${paymentNumber}`,
+                                propertyName: property.name,
+                                unitName: unit.unitNumber,
+                                unitOwner: `${unit.ownerFirstName} ${unit.ownerLastName}`,
+                                tenant: `${lease.tenantFirstName} ${lease.tenantLastName}`,
+                                paymentDueDate: formatDate(paymentDate),
+                                paymentAmount: amountPerInstalment,
+                                paymentDescription: description
+                            });
+                        }
+                    }
+                });
+                
+                return allPayments.sort((a, b) => new Date(a.paymentDueDate) - new Date(b.paymentDueDate));
+            };
+
+            // Initialize paidDate
+            useEffect(() => {
+                setPaidDate(formatDate(new Date()));
+            }, []);
+
+            // localStorage persistence
+            useEffect(() => {
+                const read = (k, fallback) => {
+                    try {
+                        const stored = localStorage.getItem(k);
+                        return stored ? JSON.parse(stored) : fallback;
+                    } catch (e) {
+                        return fallback;
+                    }
+                };
+
+                setProperties(read('pm_properties', mockProperties));
+                setUnits(read('pm_units', mockUnits));
+                setLeases(read('pm_leases', mockLeases));
+                setPaymentStatuses(read('pm_paymentStatuses', {}));
+            }, []);
+
+            useEffect(() => { 
+                localStorage.setItem('pm_properties', JSON.stringify(properties)); 
+            }, [properties]);
+            
+            useEffect(() => { 
+                localStorage.setItem('pm_units', JSON.stringify(units)); 
+            }, [units]);
+            
+            useEffect(() => { 
+                localStorage.setItem('pm_leases', JSON.stringify(leases)); 
+            }, [leases]);
+            
+            useEffect(() => { 
+                localStorage.setItem('pm_paymentStatuses', JSON.stringify(paymentStatuses)); 
+            }, [paymentStatuses]);
+
+            // Memoized calculations
+            const paymentsList = useMemo(() => {
+                return generatePaymentsList();
+            }, [leases, units, properties]);
+
+            // Mark payment as paid
+            const markPaymentAsPaid = (paymentId, paidDateValue) => {
+                setPaymentStatuses(prev => ({
+                    ...prev,
+                    [paymentId]: {
+                        isPaid: true,
+                        paidDate: paidDateValue
+                    }
+                }));
+                setShowPaymentModal(null);
+                setPaidDate(formatDate(new Date()));
+            };
+
+            // Get payments due up to today
+            const getDuePayments = () => {
+                const today = new Date();
+                today.setHours(23, 59, 59, 999);
+                
+                return paymentsList.filter(payment => {
+                    const dueDate = new Date(payment.paymentDueDate);
+                    return dueDate <= today;
+                });
+            };
+
+            // Apply filters to due payments
+            const getFilteredDuePayments = () => {
+                let filtered = getDuePayments();
+                const today = new Date();
+
+                if (paymentFilters.showOverdue) {
+                    filtered = filtered.filter(payment => {
+                        const dueDate = new Date(payment.paymentDueDate);
+                        const status = paymentStatuses[payment.paymentId];
+                        return dueDate < today && !status?.isPaid;
+                    });
+                }
+
+                if (paymentFilters.selectedProperty) {
+                    filtered = filtered.filter(payment => 
+                        payment.propertyName === paymentFilters.selectedProperty
+                    );
+                }
+
+                return filtered;
+            };
+
+            // Get unique filter options
+            const getFilterOptions = () => {
+                const duePayments = getDuePayments();
+                return {
+                    properties: [...new Set(duePayments.map(p => p.propertyName))].sort()
+                };
+            };
+
+            // Validation
+            const validatePropertyForm = () => {
+                if (!propertyForm.name.trim()) {
+                    alert('Property name is required');
+                    return false;
+                }
+                if (!propertyForm.address.trim()) {
+                    alert('Property address is required');
+                    return false;
+                }
+                if (!propertyForm.city.trim()) {
+                    alert('City is required');
+                    return false;
+                }
+                if (!propertyForm.country.trim()) {
+                    alert('Country is required');
+                    return false;
+                }
+                return true;
+            };
+
+            const validateUnitForm = () => {
+                if (!unitForm.propertyId) {
+                    alert('Property selection is required');
+                    return false;
+                }
+                if (!unitForm.unitNumber.trim()) {
+                    alert('Unit number is required');
+                    return false;
+                }
+                if (!unitForm.ownerFirstName.trim() || !unitForm.ownerLastName.trim()) {
+                    alert('Owner first and last names are required');
+                    return false;
+                }
+                const sqft = parseInt(unitForm.sqft);
+                if (!sqft || sqft <= 0) {
+                    alert('Square footage must be greater than 0');
+                    return false;
+                }
+                return true;
+            };
+
+            // Property Management
+            const addProperty = () => {
+                if (!validatePropertyForm()) return;
+                
+                if (!isPropertyNameUnique(propertyForm.name)) {
+                    alert('Property name must be unique!');
+                    return;
+                }
+
+                const newProperty = {
+                    id: Date.now(),
+                    ...propertyForm
+                };
+                setProperties([...properties, newProperty]);
+                setPropertyForm({ name: '', address: '', city: '', country: '', buildingType: 'residential' });
+                setShowPropertyForm(false);
+            };
+
+            const updateProperty = () => {
+                if (!validatePropertyForm()) return;
+                
+                if (!isPropertyNameUnique(propertyForm.name, editingProperty.id)) {
+                    alert('Property name must be unique!');
+                    return;
+                }
+
+                const updatedProperties = properties.map(property => 
+                    property.id === editingProperty.id ? { ...editingProperty, ...propertyForm } : property
+                );
+                setProperties(updatedProperties);
+                setEditingProperty(null);
+                setShowPropertyForm(false);
+                setPropertyForm({ name: '', address: '', city: '', country: '', buildingType: 'residential' });
+            };
+
+            const deleteProperty = (propertyId) => {
+                if (!window.confirm('Are you sure you want to delete this property?')) return;
+                
+                const affectedUnitIds = new Set(units.filter(u => u.propertyId === propertyId).map(u => u.id));
+                setProperties(prev => prev.filter(p => p.id !== propertyId));
+                setUnits(prev => prev.filter(u => u.propertyId !== propertyId));
+                setLeases(prev => prev.filter(l => !affectedUnitIds.has(l.unitId)));
+            };
+
+            const editProperty = (property) => {
+                setEditingProperty(property);
+                setPropertyForm({
+                    name: property.name,
+                    address: property.address,
+                    city: property.city,
+                    country: property.country,
+                    buildingType: property.buildingType
+                });
+                setShowPropertyForm(true);
+            };
+
+            // Unit Management
+            const addUnit = () => {
+                if (!validateUnitForm()) return;
+                
+                if (!isUnitNumberUnique(unitForm.propertyId, unitForm.unitNumber)) {
+                    alert('Unit number must be unique within the selected property!');
+                    return;
+                }
+
+                const newUnit = {
+                    id: Date.now(),
+                    ...unitForm,
+                    propertyId: parseInt(unitForm.propertyId),
+                    bedrooms: unitForm.unitUse === 'Residential' ? parseInt(unitForm.bedrooms) || 0 : null,
+                    bathrooms: unitForm.unitUse === 'Residential' ? parseFloat(unitForm.bathrooms) || 0 : null,
+                    sqft: parseInt(unitForm.sqft) || 0
+                };
+                setUnits([...units, newUnit]);
+                setUnitForm({
+                    propertyId: '',
+                    unitNumber: '',
+                    unitUse: 'Residential',
+                    type: '',
+                    bedrooms: '',
+                    bathrooms: '',
+                    sqft: '',
+                    ownerFirstName: '',
+                    ownerLastName: '',
+                    ownerNationalId: '',
+                    ownerPhone: '',
+                    description: ''
+                });
+                setShowUnitForm(false);
+            };
+
+            const updateUnit = () => {
+                if (!validateUnitForm()) return;
+                
+                if (!isUnitNumberUnique(unitForm.propertyId, unitForm.unitNumber, editingUnit.id)) {
+                    alert('Unit number must be unique within the selected property!');
+                    return;
+                }
+
+                const updatedUnits = units.map(unit => 
+                    unit.id === editingUnit.id ? { 
+                        ...editingUnit, 
+                        ...unitForm,
+                        propertyId: parseInt(unitForm.propertyId),
+                        bedrooms: unitForm.unitUse === 'Residential' ? parseInt(unitForm.bedrooms) || 0 : null,
+                        bathrooms: unitForm.unitUse === 'Residential' ? parseFloat(unitForm.bathrooms) || 0 : null,
+                        sqft: parseInt(unitForm.sqft) || 0
+                    } : unit
+                );
+                setUnits(updatedUnits);
+                setEditingUnit(null);
+                setShowUnitForm(false);
+                setUnitForm({
+                    propertyId: '',
+                    unitNumber: '',
+                    unitUse: 'Residential',
+                    type: '',
+                    bedrooms: '',
+                    bathrooms: '',
+                    sqft: '',
+                    ownerFirstName: '',
+                    ownerLastName: '',
+                    ownerNationalId: '',
+                    ownerPhone: '',
+                    description: ''
+                });
+            };
+
+            const deleteUnit = (unitId) => {
+                if (!window.confirm('Are you sure you want to delete this unit?')) return;
+                setUnits(units.filter(unit => unit.id !== unitId));
+                setLeases(leases.filter(lease => lease.unitId !== unitId));
+            };
+
+            const editUnit = (unit) => {
+                setEditingUnit(unit);
+                setUnitForm({
+                    propertyId: unit.propertyId.toString(),
+                    unitNumber: unit.unitNumber,
+                    unitUse: unit.unitUse,
+                    type: unit.type,
+                    bedrooms: unit.bedrooms?.toString() || '',
+                    bathrooms: unit.bathrooms?.toString() || '',
+                    sqft: unit.sqft.toString(),
+                    ownerFirstName: unit.ownerFirstName,
+                    ownerLastName: unit.ownerLastName,
+                    ownerNationalId: unit.ownerNationalId,
+                    ownerPhone: unit.ownerPhone,
+                    description: unit.description
+                });
+                setShowUnitForm(true);
+            };
+
+            const getUnitDetails = (unit) => {
+                if (unit.unitUse === 'Residential') {
+                    return `${unit.bedrooms}br/${unit.bathrooms}ba, ${unit.sqft} sqft`;
+                } else {
+                    return `${unit.sqft} sqft`;
+                }
+            };
+
+            // Calculate stats
+            const totalUnits = units.length;
+            const occupiedUnitIds = new Set(leases.filter(l => l.status === 'active').map(l => l.unitId));
+            const occupiedUnits = occupiedUnitIds.size;
+            const totalContractValue = leases.filter(l => l.status === 'active').reduce((sum, lease) => sum + lease.totalContractValue, 0);
+            const occupancyRate = totalUnits > 0 ? ((occupiedUnits / totalUnits) * 100).toFixed(1) : 0;
+
+            return React.createElement('div', { className: "min-h-screen bg-gray-50 p-6" },
+                React.createElement('div', { className: "max-w-7xl mx-auto" },
+                    React.createElement('div', { className: "mb-8" },
+                        React.createElement('h1', { className: "text-3xl font-bold text-gray-900 mb-2" }, 'Property Management Dashboard'),
+                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-4 gap-4" },
+                            React.createElement('div', { className: "bg-white p-4 rounded-lg shadow-sm border" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(Building2, { className: "w-5 h-5 text-purple-500 mr-2" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, 'Total Properties'),
+                                        React.createElement('p', { className: "text-2xl font-semibold" }, properties.length)
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "bg-white p-4 rounded-lg shadow-sm border" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(Home, { className: "w-5 h-5 text-blue-500 mr-2" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, 'Total Units'),
+                                        React.createElement('p', { className: "text-2xl font-semibold" }, totalUnits)
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "bg-white p-4 rounded-lg shadow-sm border" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(TrendingUp, { className: "w-5 h-5 text-green-500 mr-2" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, 'Occupancy Rate'),
+                                        React.createElement('p', { className: "text-2xl font-semibold" }, `${occupancyRate}%`)
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "bg-white p-4 rounded-lg shadow-sm border" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(DollarSign, { className: "w-5 h-5 text-emerald-500 mr-2" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, 'Total Contract Value'),
+                                        React.createElement('p', { className: "text-2xl font-semibold" }, `$${totalContractValue.toLocaleString()}`)
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    React.createElement('div', { className: "mb-6" },
+                        React.createElement('div', { className: "border-b border-gray-200" },
+                            React.createElement('nav', { className: "-mb-px flex space-x-8" },
+                                [
+                                    { id: 'properties', label: 'Properties', icon: Building2 },
+                                    { id: 'units', label: 'Units', icon: Home },
+                                    { id: 'paymentcheckpoint', label: 'Payment Checkpoint', icon: Calendar }
+                                ].map(({ id, label, icon: Icon }) =>
+                                    React.createElement('button', {
+                                        key: id,
+                                        onClick: () => setActiveTab(id),
+                                        className: `flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
+                                            activeTab === id
+                                                ? 'border-blue-500 text-blue-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        }`
+                                    },
+                                        React.createElement(Icon, { className: "w-4 h-4 mr-2" }),
+                                        label
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    // Properties Tab
+                    activeTab === 'properties' && React.createElement('div', { className: "space-y-6" },
+                        React.createElement('div', { className: "flex justify-between items-center" },
+                            React.createElement('h2', { className: "text-xl font-semibold" }, 'Properties'),
+                            React.createElement('button', {
+                                onClick: () => setShowPropertyForm(true),
+                                className: "bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                            },
+                                React.createElement(Plus, { className: "w-4 h-4 mr-2" }),
+                                'Add Property'
+                            )
+                        ),
+
+                        showPropertyForm && React.createElement('div', { className: "bg-white p-6 rounded-lg shadow-sm border" },
+                            React.createElement('h3', { className: "text-lg font-medium mb-4" }, editingProperty ? 'Edit Property' : 'Add New Property'),
+                            React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Property Name (Unique)",
+                                    value: propertyForm.name,
+                                    onChange: (e) => setPropertyForm({...propertyForm, name: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Country",
+                                    value: propertyForm.country,
+                                    onChange: (e) => setPropertyForm({...propertyForm, country: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "City",
+                                    value: propertyForm.city,
+                                    onChange: (e) => setPropertyForm({...propertyForm, city: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Property Address",
+                                    value: propertyForm.address,
+                                    onChange: (e) => setPropertyForm({...propertyForm, address: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('select', {
+                                    value: propertyForm.buildingType,
+                                    onChange: (e) => setPropertyForm({...propertyForm, buildingType: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                },
+                                    React.createElement('option', { value: "residential" }, 'Residential'),
+                                    React.createElement('option', { value: "office" }, 'Office'),
+                                    React.createElement('option', { value: "retail" }, 'Retail'),
+                                    React.createElement('option', { value: "storage" }, 'Storage'),
+                                    React.createElement('option', { value: "mixed-use" }, 'Mixed-Use')
+                                )
+                            ),
+                            React.createElement('div', { className: "flex space-x-3 mt-4" },
+                                React.createElement('button', {
+                                    onClick: editingProperty ? updateProperty : addProperty,
+                                    className: "bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                                }, editingProperty ? 'Update Property' : 'Add Property'),
+                                React.createElement('button', {
+                                    onClick: () => {
+                                        setShowPropertyForm(false);
+                                        setEditingProperty(null);
+                                        setPropertyForm({ name: '', address: '', city: '', country: '', buildingType: 'residential' });
+                                    },
+                                    className: "bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                                }, 'Cancel')
+                            )
+                        ),
+
+                        React.createElement('div', { className: "bg-white rounded-lg shadow-sm border" },
+                            React.createElement('div', { className: "overflow-x-auto" },
+                                React.createElement('table', { className: "w-full" },
+                                    React.createElement('thead', { className: "bg-gray-50 border-b" },
+                                        React.createElement('tr', null,
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Property Name'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Country'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'City'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Address'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Building Type'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Actions')
+                                        )
+                                    ),
+                                    React.createElement('tbody', null,
+                                        properties.map((property) =>
+                                            React.createElement('tr', { key: property.id, className: "border-b hover:bg-gray-50" },
+                                                React.createElement('td', { className: "py-3 px-4 font-medium" }, property.name),
+                                                React.createElement('td', { className: "py-3 px-4" }, property.country),
+                                                React.createElement('td', { className: "py-3 px-4" }, property.city),
+                                                React.createElement('td', { className: "py-3 px-4" }, property.address),
+                                                React.createElement('td', { className: "py-3 px-4 capitalize" }, property.buildingType),
+                                                React.createElement('td', { className: "py-3 px-4" },
+                                                    React.createElement('div', { className: "flex space-x-2" },
+                                                        React.createElement('button', {
+                                                            onClick: () => editProperty(property),
+                                                            className: "text-blue-600 hover:text-blue-800"
+                                                        }, React.createElement(Edit2, { className: "w-4 h-4" })),
+                                                        React.createElement('button', {
+                                                            onClick: () => deleteProperty(property.id),
+                                                            className: "text-red-600 hover:text-red-800"
+                                                        }, React.createElement(Trash2, { className: "w-4 h-4" }))
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    // Units Tab
+                    activeTab === 'units' && React.createElement('div', { className: "space-y-6" },
+                        React.createElement('div', { className: "flex justify-between items-center" },
+                            React.createElement('h2', { className: "text-xl font-semibold" }, 'Property Units'),
+                            React.createElement('button', {
+                                onClick: () => setShowUnitForm(true),
+                                className: "bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center",
+                                disabled: properties.length === 0
+                            },
+                                React.createElement(Plus, { className: "w-4 h-4 mr-2" }),
+                                'Add Unit'
+                            )
+                        ),
+
+                        properties.length === 0 && React.createElement('div', { className: "bg-yellow-50 border border-yellow-200 rounded-lg p-4" },
+                            React.createElement('p', { className: "text-yellow-800" }, 'Please add properties first before creating units.')
+                        ),
+
+                        showUnitForm && properties.length > 0 && React.createElement('div', { className: "bg-white p-6 rounded-lg shadow-sm border" },
+                            React.createElement('h3', { className: "text-lg font-medium mb-4" }, editingUnit ? 'Edit Unit' : 'Add New Unit'),
+                            React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                                React.createElement('select', {
+                                    value: unitForm.propertyId,
+                                    onChange: (e) => setUnitForm({...unitForm, propertyId: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                },
+                                    React.createElement('option', { value: "" }, 'Select Property'),
+                                    properties.map(property =>
+                                        React.createElement('option', { key: property.id, value: property.id }, property.name)
+                                    )
+                                ),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Unit Number (Unique per property)",
+                                    value: unitForm.unitNumber,
+                                    onChange: (e) => setUnitForm({...unitForm, unitNumber: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('select', {
+                                    value: unitForm.unitUse,
+                                    onChange: (e) => setUnitForm({...unitForm, unitUse: e.target.value, type: ''}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                },
+                                    React.createElement('option', { value: "Residential" }, 'Residential'),
+                                    React.createElement('option', { value: "Retail" }, 'Retail'),
+                                    React.createElement('option', { value: "Office" }, 'Office'),
+                                    React.createElement('option', { value: "Storage" }, 'Storage'),
+                                    React.createElement('option', { value: "Other" }, 'Other')
+                                ),
+                                
+                                unitForm.unitUse !== 'Other' ?
+                                    React.createElement('select', {
+                                        value: unitForm.type,
+                                        onChange: (e) => setUnitForm({...unitForm, type: e.target.value}),
+                                        className: "border border-gray-300 rounded-md px-3 py-2"
+                                    },
+                                        React.createElement('option', { value: "" }, 'Select Unit Type'),
+                                        getUnitTypeOptions(unitForm.unitUse).map(type =>
+                                            React.createElement('option', { key: type, value: type }, type)
+                                        )
+                                    ) :
+                                    React.createElement('input', {
+                                        type: "text",
+                                        placeholder: "Custom Unit Description",
+                                        value: unitForm.type,
+                                        onChange: (e) => setUnitForm({...unitForm, type: e.target.value}),
+                                        className: "border border-gray-300 rounded-md px-3 py-2"
+                                    }),
+
+                                unitForm.unitUse === 'Residential' && [
+                                    React.createElement('input', {
+                                        key: "bedrooms",
+                                        type: "number",
+                                        placeholder: "Bedrooms",
+                                        value: unitForm.bedrooms,
+                                        onChange: (e) => setUnitForm({...unitForm, bedrooms: e.target.value}),
+                                        className: "border border-gray-300 rounded-md px-3 py-2"
+                                    }),
+                                    React.createElement('input', {
+                                        key: "bathrooms",
+                                        type: "number",
+                                        step: "0.5",
+                                        placeholder: "Bathrooms",
+                                        value: unitForm.bathrooms,
+                                        onChange: (e) => setUnitForm({...unitForm, bathrooms: e.target.value}),
+                                        className: "border border-gray-300 rounded-md px-3 py-2"
+                                    })
+                                ],
+                                
+                                React.createElement('input', {
+                                    type: "number",
+                                    placeholder: "Square Feet",
+                                    value: unitForm.sqft,
+                                    onChange: (e) => setUnitForm({...unitForm, sqft: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Owner First Name",
+                                    value: unitForm.ownerFirstName,
+                                    onChange: (e) => setUnitForm({...unitForm, ownerFirstName: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Owner Last Name",
+                                    value: unitForm.ownerLastName,
+                                    onChange: (e) => setUnitForm({...unitForm, ownerLastName: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "text",
+                                    placeholder: "Owner National ID",
+                                    value: unitForm.ownerNationalId,
+                                    onChange: (e) => setUnitForm({...unitForm, ownerNationalId: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                }),
+                                React.createElement('input', {
+                                    type: "tel",
+                                    placeholder: "Owner Phone Number",
+                                    value: unitForm.ownerPhone,
+                                    onChange: (e) => setUnitForm({...unitForm, ownerPhone: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2"
+                                })
+                            ),
+                            React.createElement('div', { className: "mt-4" },
+                                React.createElement('textarea', {
+                                    placeholder: "Additional Description",
+                                    value: unitForm.description,
+                                    onChange: (e) => setUnitForm({...unitForm, description: e.target.value}),
+                                    className: "w-full border border-gray-300 rounded-md px-3 py-2",
+                                    rows: "3"
+                                })
+                            ),
+                            React.createElement('div', { className: "flex space-x-3 mt-4" },
+                                React.createElement('button', {
+                                    onClick: editingUnit ? updateUnit : addUnit,
+                                    className: "bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                                }, editingUnit ? 'Update Unit' : 'Add Unit'),
+                                React.createElement('button', {
+                                    onClick: () => {
+                                        setShowUnitForm(false);
+                                        setEditingUnit(null);
+                                        setUnitForm({
+                                            propertyId: '',
+                                            unitNumber: '',
+                                            unitUse: 'Residential',
+                                            type: '',
+                                            bedrooms: '',
+                                            bathrooms: '',
+                                            sqft: '',
+                                            ownerFirstName: '',
+                                            ownerLastName: '',
+                                            ownerNationalId: '',
+                                            ownerPhone: '',
+                                            description: ''
+                                        });
+                                    },
+                                    className: "bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                                }, 'Cancel')
+                            )
+                        ),
+
+                        React.createElement('div', { className: "bg-white rounded-lg shadow-sm border" },
+                            React.createElement('div', { className: "overflow-x-auto" },
+                                React.createElement('table', { className: "w-full" },
+                                    React.createElement('thead', { className: "bg-gray-50 border-b" },
+                                        React.createElement('tr', null,
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Property'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Unit #'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Use-Type-Details'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Owner'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Owner Phone'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Actions')
+                                        )
+                                    ),
+                                    React.createElement('tbody', null,
+                                        units.map((unit) => {
+                                            const property = properties.find(p => p.id === unit.propertyId);
+                                            return React.createElement('tr', { key: unit.id, className: "border-b hover:bg-gray-50" },
+                                                React.createElement('td', { className: "py-3 px-4" }, property?.name || 'Unknown'),
+                                                React.createElement('td', { className: "py-3 px-4" }, unit.unitNumber),
+                                                React.createElement('td', { className: "py-3 px-4" }, `${unit.unitUse}-${unit.type}-${getUnitDetails(unit)}`),
+                                                React.createElement('td', { className: "py-3 px-4" }, `${unit.ownerFirstName} ${unit.ownerLastName}`),
+                                                React.createElement('td', { className: "py-3 px-4" }, unit.ownerPhone || 'N/A'),
+                                                React.createElement('td', { className: "py-3 px-4" },
+                                                    React.createElement('div', { className: "flex space-x-2" },
+                                                        React.createElement('button', {
+                                                            onClick: () => editUnit(unit),
+                                                            className: "text-blue-600 hover:text-blue-800"
+                                                        }, React.createElement(Edit2, { className: "w-4 h-4" })),
+                                                        React.createElement('button', {
+                                                            onClick: () => deleteUnit(unit.id),
+                                                            className: "text-red-600 hover:text-red-800"
+                                                        }, React.createElement(Trash2, { className: "w-4 h-4" }))
+                                                    )
+                                                )
+                                            );
+                                        })
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    // Payment Checkpoint Tab
+                    activeTab === 'paymentcheckpoint' && React.createElement('div', { className: "space-y-6" },
+                        React.createElement('div', { className: "flex justify-between items-center" },
+                            React.createElement('h2', { className: "text-xl font-semibold" }, 'Payment Checkpoint'),
+                            React.createElement('div', { className: "text-sm text-gray-600" }, `Showing payments due up to ${formatDate(new Date())}`)
+                        ),
+
+                        React.createElement('div', { className: "bg-white p-4 rounded-lg shadow-sm border" },
+                            React.createElement('h3', { className: "text-md font-medium mb-3" }, 'Filters'),
+                            React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-4 gap-4" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement('input', {
+                                        type: "checkbox",
+                                        id: "showOverdue",
+                                        checked: paymentFilters.showOverdue,
+                                        onChange: (e) => setPaymentFilters({...paymentFilters, showOverdue: e.target.checked}),
+                                        className: "mr-2"
+                                    }),
+                                    React.createElement('label', { htmlFor: "showOverdue", className: "text-sm font-medium text-red-600" }, 'Show Overdue Only')
+                                ),
+                                
+                                React.createElement('select', {
+                                    value: paymentFilters.selectedProperty,
+                                    onChange: (e) => setPaymentFilters({...paymentFilters, selectedProperty: e.target.value}),
+                                    className: "border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                },
+                                    React.createElement('option', { value: "" }, 'All Properties'),
+                                    getFilterOptions().properties.map(property =>
+                                        React.createElement('option', { key: property, value: property }, property)
+                                    )
+                                ),
+
+                                React.createElement('button', {
+                                    onClick: () => setPaymentFilters({
+                                        showOverdue: false,
+                                        selectedProperty: '',
+                                        selectedUnit: '',
+                                        selectedOwner: '',
+                                        selectedTenant: ''
+                                    }),
+                                    className: "bg-gray-500 text-white px-3 py-2 rounded-md text-sm hover:bg-gray-600"
+                                }, 'Clear Filters')
+                            )
+                        ),
+
+                        React.createElement('div', { className: "bg-white rounded-lg shadow-sm border" },
+                            React.createElement('div', { className: "px-6 py-4 border-b" },
+                                React.createElement('h3', { className: "text-lg font-medium" }, `Due Payments (${getFilteredDuePayments().length} payments)`)
+                            ),
+                            React.createElement('div', { className: "overflow-x-auto" },
+                                React.createElement('table', { className: "w-full" },
+                                    React.createElement('thead', { className: "bg-gray-50 border-b" },
+                                        React.createElement('tr', null,
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Payment ID'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Property'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Unit'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Tenant'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Due Date'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Amount'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Description'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Status'),
+                                            React.createElement('th', { className: "text-left py-3 px-4 font-medium text-gray-900" }, 'Action')
+                                        )
+                                    ),
+                                    React.createElement('tbody', null,
+                                        getFilteredDuePayments().map((payment, index) => {
+                                            const status = paymentStatuses[payment.paymentId];
+                                            const dueDate = new Date(payment.paymentDueDate);
+                                            const today = new Date();
+                                            const isOverdue = dueDate < today && !status?.isPaid;
+                                            const daysLate = isOverdue ? Math.ceil((today - dueDate) / (1000*60*60*24)) : 0;
+                                            
+                                            return React.createElement('tr', { key: index, className: `border-b hover:bg-gray-50 ${isOverdue ? 'bg-red-50' : ''}` },
+                                                React.createElement('td', { className: "py-3 px-4 font-mono text-xs" }, payment.paymentId),
+                                                React.createElement('td', { className: "py-3 px-4" }, payment.propertyName),
+                                                React.createElement('td', { className: "py-3 px-4" }, payment.unitName),
+                                                React.createElement('td', { className: "py-3 px-4" }, payment.tenant),
+                                                React.createElement('td', { className: `py-3 px-4 ${isOverdue ? 'text-red-600 font-medium' : ''}` }, payment.paymentDueDate),
+                                                React.createElement('td', { className: "py-3 px-4" }, `${payment.paymentAmount.toLocaleString()}`),
+                                                React.createElement('td', { className: "py-3 px-4" },
+                                                    React.createElement('span', {
+                                                        className: `px-2 py-1 rounded-full text-xs font-medium ${
+                                                            payment.paymentDescription === 'Security Deposit' 
+                                                                ? 'bg-blue-100 text-blue-800' 
+                                                                : payment.paymentDescription.includes('First')
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : payment.paymentDescription.includes('Last')
+                                                                ? 'bg-red-100 text-red-800'
+                                                                : 'bg-gray-100 text-gray-800'
+                                                        }`
+                                                    }, payment.paymentDescription)
+                                                ),
+                                                React.createElement('td', { className: "py-3 px-4" },
+                                                    status?.isPaid ?
+                                                        React.createElement('div', { className: "text-center" },
+                                                            React.createElement('span', { className: "px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" }, 'Paid'),
+                                                            React.createElement('div', { className: "text-xs text-gray-500 mt-1" }, status.paidDate)
+                                                        ) :
+                                                        isOverdue ?
+                                                            React.createElement('div', { className: "text-center" },
+                                                                React.createElement('span', { className: "px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800" }, 'Overdue'),
+                                                                React.createElement('div', { className: "text-xs text-red-600 mt-1" }, `(${daysLate} days late)`)
+                                                            ) :
+                                                            React.createElement('span', { className: "px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" }, 'Pending')
+                                                ),
+                                                React.createElement('td', { className: "py-3 px-4" },
+                                                    !status?.isPaid && React.createElement('button', {
+                                                        onClick: () => {
+                                                            setShowPaymentModal(payment);
+                                                            setPaidDate(formatDate(new Date()));
+                                                        },
+                                                        className: "bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                                                    }, 'Mark Paid')
+                                                )
+                                            );
+                                        })
+                                    )
+                                )
+                            ),
+                            getFilteredDuePayments().length === 0 && React.createElement('div', { className: "p-8 text-center text-gray-500" }, 'No payments match the current filters.')
+                        )
+                    ),
+
+                    // Payment Modal
+                    showPaymentModal && React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" },
+                        React.createElement('div', { className: "bg-white p-6 rounded-lg max-w-md w-full mx-4" },
+                            React.createElement('h3', { className: "text-lg font-medium mb-4" }, 'Mark Payment as Paid'),
+                            React.createElement('div', { className: "space-y-3 mb-4" },
+                                React.createElement('div', null, React.createElement('strong', null, 'Payment ID:'), ' ', showPaymentModal.paymentId),
+                                React.createElement('div', null, React.createElement('strong', null, 'Property:'), ' ', showPaymentModal.propertyName),
+                                React.createElement('div', null, React.createElement('strong', null, 'Unit:'), ' ', showPaymentModal.unitName),
+                                React.createElement('div', null, React.createElement('strong', null, 'Tenant:'), ' ', showPaymentModal.tenant),
+                                React.createElement('div', null, React.createElement('strong', null, 'Amount:'), ' , showPaymentModal.paymentAmount.toLocaleString()),
+                                React.createElement('div', null, React.createElement('strong', null, 'Due Date:'), ' ', showPaymentModal.paymentDueDate),
+                                React.createElement('div', null, React.createElement('strong', null, 'Description:'), ' ', showPaymentModal.paymentDescription)
+                            ),
+                            React.createElement('div', { className: "mb-4" },
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, 'Actual Payment Date:'),
+                                React.createElement('input', {
+                                    type: "date",
+                                    value: paidDate,
+                                    onChange: (e) => setPaidDate(e.target.value),
+                                    className: "w-full border border-gray-300 rounded-md px-3 py-2"
+                                })
+                            ),
+                            React.createElement('div', { className: "flex space-x-3" },
+                                React.createElement('button', {
+                                    onClick: () => markPaymentAsPaid(showPaymentModal.paymentId, paidDate),
+                                    className: "bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                                }, 'Confirm Payment'),
+                                React.createElement('button', {
+                                    onClick: () => setShowPaymentModal(null),
+                                    className: "bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                                }, 'Cancel')
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+        ReactDOM.render(React.createElement(PropertyManagementDashboard), document.getElementById('root'));
+    </script>
+</body>
+</html>
